@@ -1,0 +1,4 @@
+user: user@demo.com
+password: userdemo1@
+admin: admin@demo.com
+password: useradmin1@

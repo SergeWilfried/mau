@@ -1,0 +1,33 @@
+{
+  "name": "douniapi",
+  "version": "1.0.0",
+  "description": "NestJS API",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "nest build",
+    "start": "nest start",
+    "start:dev": "nest start --watch",
+    "start:debug": "nest start --debug --watch",
+    "start:prod": "node dist/main",
+    "seed": "ts-node src/scripts/seed.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@nestjs/common": "^11.1.11",
+    "@nestjs/config": "^4.0.2",
+    "@nestjs/core": "^11.1.11",
+    "@nestjs/platform-express": "^11.1.11",
+    "@supabase/supabase-js": "^2.90.1",
+    "dotenv": "^17.2.3",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.14",
+    "@types/node": "^25.0.8",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  }
+}
