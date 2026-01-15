@@ -41,6 +41,19 @@ export class TransactionsService {
     };
   }
 
+  async getRecentTransactions(userId: string, limit: number = 10) {
+    const { data, error } = await this.supabaseService
+      .getAdminClient()
+      .from('transactions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) throw new BadRequestException(error.message);
+    return { transactions: data };
+  }
+
   async getTransaction(userId: string, transactionId: string) {
     const { data, error } = await this.supabaseService
       .getAdminClient()
