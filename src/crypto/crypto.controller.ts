@@ -1,45 +1,25 @@
-import { Controller, Get, Post, Param, Body, Query } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, Query, UseGuards } from '@nestjs/common';
+import { CryptoService } from './crypto.service';
+import { AuthGuard } from '../common/guards/auth.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @Controller('crypto')
+@UseGuards(AuthGuard)
 export class CryptoController {
+  constructor(private readonly cryptoService: CryptoService) {}
+
   // ==================== PORTFOLIO ====================
 
-  // GET /crypto/portfolio - Get crypto portfolio overview
   @Get('portfolio')
-  getPortfolio(@Query('currency') currency: string = 'EUR') {
-    return {
-      totalValue: 5000.0,
-      currency,
-      totalProfitLoss: 250.0,
-      totalProfitLossPercentage: 5.26,
-      assets: [
-        {
-          symbol: 'BTC',
-          name: 'Bitcoin',
-          balance: 0.05,
-          value: 2500.0,
-          price: 50000.0,
-          profitLoss: 150.0,
-          profitLossPercentage: 6.38,
-          allocation: 50,
-        },
-        {
-          symbol: 'ETH',
-          name: 'Ethereum',
-          balance: 1.5,
-          value: 2500.0,
-          price: 1666.67,
-          profitLoss: 100.0,
-          profitLossPercentage: 4.17,
-          allocation: 50,
-        },
-      ],
-    };
+  getPortfolio(
+    @CurrentUser() user: any,
+    @Query('currency') currency: string = 'EUR',
+  ) {
+    return this.cryptoService.getPortfolio(user.id, currency);
   }
 
   // ==================== ASSETS & PRICES ====================
 
-  // GET /crypto/assets - List available cryptocurrencies
   @Get('assets')
   getAssets(@Query('search') search?: string) {
     return {
@@ -54,69 +34,61 @@ export class CryptoController {
     };
   }
 
-  // GET /crypto/assets/:symbol - Get asset details
   @Get('assets/:symbol')
   getAsset(@Param('symbol') symbol: string) {
+    const price = this.cryptoService.getPrice(symbol);
     return {
-      symbol,
+      symbol: symbol.toUpperCase(),
       name: 'Bitcoin',
       description: 'The first decentralized cryptocurrency',
-      price: 50000.0,
+      price,
       marketCap: 980000000000,
       volume24h: 25000000000,
       change24h: 2.5,
       change7d: 8.3,
-      high24h: 51000.0,
-      low24h: 49000.0,
+      high24h: price * 1.02,
+      low24h: price * 0.98,
       allTimeHigh: 69000.0,
       circulatingSupply: 19600000,
       maxSupply: 21000000,
     };
   }
 
-  // GET /crypto/prices - Get current prices
   @Get('prices')
   getPrices(
     @Query('symbols') symbols?: string,
     @Query('currency') currency: string = 'EUR',
   ) {
-    return {
-      currency,
-      prices: {
-        BTC: { price: 50000.0, change24h: 2.5 },
-        ETH: { price: 1666.67, change24h: 1.8 },
-        SOL: { price: 120.0, change24h: -1.2 },
-        XRP: { price: 0.65, change24h: 3.1 },
-      },
-      timestamp: new Date().toISOString(),
-    };
+    const symbolList = symbols ? symbols.split(',') : undefined;
+    return this.cryptoService.getPrices(symbolList, currency);
   }
 
-  // GET /crypto/assets/:symbol/chart - Get price chart data
   @Get('assets/:symbol/chart')
   getChart(
     @Param('symbol') symbol: string,
     @Query('period') period: '1h' | '1d' | '1w' | '1m' | '1y' = '1d',
     @Query('currency') currency: string = 'EUR',
   ) {
+    const price = this.cryptoService.getPrice(symbol);
     return {
       symbol,
       period,
       currency,
       data: [
-        { timestamp: '2024-01-15T00:00:00Z', price: 49500.0 },
-        { timestamp: '2024-01-15T06:00:00Z', price: 49800.0 },
-        { timestamp: '2024-01-15T12:00:00Z', price: 50200.0 },
-        { timestamp: '2024-01-15T18:00:00Z', price: 50000.0 },
+        { timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), price: price * 0.99 },
+        { timestamp: new Date(Date.now() - 18 * 60 * 60 * 1000).toISOString(), price: price * 0.995 },
+        { timestamp: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(), price: price * 1.01 },
+        { timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(), price: price * 1.005 },
+        { timestamp: new Date().toISOString(), price },
       ],
     };
   }
 
   // ==================== TRADING ====================
 
-  // POST /crypto/buy - Buy cryptocurrency
   @Post('buy')
   buyCrypto(
+    @CurrentUser() user: any,
     @Body() body: {
       symbol: string;
       amount?: number;
@@ -124,22 +96,18 @@ export class CryptoController {
       fromAccountId: string;
     },
   ) {
-    return {
-      transactionId: 'crypto_001',
-      type: 'buy',
-      symbol: body.symbol,
-      amount: body.amount || 0.001,
-      price: 50000.0,
-      fiatAmount: body.fiatAmount || 50.0,
-      fee: 0.5,
-      status: 'completed',
-      executedAt: new Date().toISOString(),
-    };
+    return this.cryptoService.buyCrypto(
+      user.id,
+      body.symbol,
+      body.fromAccountId,
+      body.amount,
+      body.fiatAmount,
+    );
   }
 
-  // POST /crypto/sell - Sell cryptocurrency
   @Post('sell')
   sellCrypto(
+    @CurrentUser() user: any,
     @Body() body: {
       symbol: string;
       amount?: number;
@@ -147,22 +115,18 @@ export class CryptoController {
       toAccountId: string;
     },
   ) {
-    return {
-      transactionId: 'crypto_002',
-      type: 'sell',
-      symbol: body.symbol,
-      amount: body.amount || 0.001,
-      price: 50000.0,
-      fiatAmount: body.fiatAmount || 50.0,
-      fee: 0.5,
-      status: 'completed',
-      executedAt: new Date().toISOString(),
-    };
+    return this.cryptoService.sellCrypto(
+      user.id,
+      body.symbol,
+      body.toAccountId,
+      body.amount,
+      body.fiatAmount,
+    );
   }
 
-  // POST /crypto/swap - Swap between cryptocurrencies
   @Post('swap')
   swapCrypto(
+    @CurrentUser() user: any,
     @Body() body: {
       fromSymbol: string;
       toSymbol: string;
@@ -170,21 +134,15 @@ export class CryptoController {
       toAmount?: number;
     },
   ) {
-    return {
-      transactionId: 'crypto_003',
-      type: 'swap',
-      fromSymbol: body.fromSymbol,
-      toSymbol: body.toSymbol,
-      fromAmount: body.fromAmount || 0.01,
-      toAmount: 0.15,
-      rate: 15.0,
-      fee: 0.001,
-      status: 'completed',
-      executedAt: new Date().toISOString(),
-    };
+    return this.cryptoService.swapCrypto(
+      user.id,
+      body.fromSymbol,
+      body.toSymbol,
+      body.fromAmount,
+      body.toAmount,
+    );
   }
 
-  // POST /crypto/quote - Get trade quote before executing
   @Post('quote')
   getQuote(
     @Body() body: {
@@ -196,26 +154,41 @@ export class CryptoController {
       fiatAmount?: number;
     },
   ) {
+    const symbol = body.symbol || body.fromSymbol || 'BTC';
+    const price = this.cryptoService.getPrice(symbol);
+    const feePercentage = body.type === 'swap' ? 0.005 : 0.01;
+
+    let amount = body.amount || 0;
+    let fiatAmount = body.fiatAmount || 0;
+
+    if (fiatAmount && !amount) {
+      amount = fiatAmount / price;
+    } else if (amount && !fiatAmount) {
+      fiatAmount = amount * price;
+    }
+
+    const fee = fiatAmount * feePercentage;
+
     return {
-      quoteId: 'quote_crypto_001',
+      quoteId: `quote_${Date.now()}`,
       type: body.type,
-      symbol: body.symbol || body.fromSymbol,
-      amount: body.amount || 0.001,
-      price: 50000.0,
-      fiatAmount: body.fiatAmount || 50.0,
-      fee: 0.5,
-      total: 50.5,
+      symbol: symbol.toUpperCase(),
+      amount,
+      price,
+      fiatAmount,
+      fee,
+      total: body.type === 'buy' ? fiatAmount + fee : fiatAmount - fee,
       expiresAt: new Date(Date.now() + 30000).toISOString(),
     };
   }
 
-  // POST /crypto/execute - Execute a quoted trade
   @Post('execute')
   executeQuote(
     @Body() body: { quoteId: string; fromAccountId?: string; toAccountId?: string },
   ) {
+    // In production, would lookup the quote and execute it
     return {
-      transactionId: 'crypto_004',
+      transactionId: `tx_${Date.now()}`,
       status: 'completed',
       message: 'Trade executed successfully',
     };
@@ -223,59 +196,37 @@ export class CryptoController {
 
   // ==================== WALLETS & TRANSFERS ====================
 
-  // GET /crypto/wallets - Get crypto wallet addresses
   @Get('wallets')
-  getWallets() {
-    return {
-      wallets: [
-        {
-          symbol: 'BTC',
-          network: 'bitcoin',
-          address: 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',
-          balance: 0.05,
-        },
-        {
-          symbol: 'ETH',
-          network: 'ethereum',
-          address: '0x742d35Cc6634C0532925a3b844Bc9e7595f8C1a0',
-          balance: 1.5,
-        },
-      ],
-    };
+  getWallets(@CurrentUser() user: any) {
+    return this.cryptoService.getWallets(user.id);
   }
 
-  // GET /crypto/wallets/:symbol - Get wallet for specific crypto
   @Get('wallets/:symbol')
-  getWallet(@Param('symbol') symbol: string, @Query('network') network?: string) {
-    return {
-      symbol,
-      network: network || 'mainnet',
-      address: '0x742d35Cc6634C0532925a3b844Bc9e7595f8C1a0',
-      balance: 1.5,
-      networks: [
-        { name: 'Ethereum', network: 'ethereum', fee: 0.001 },
-        { name: 'Polygon', network: 'polygon', fee: 0.0001 },
-        { name: 'Arbitrum', network: 'arbitrum', fee: 0.0005 },
-      ],
-    };
+  getWallet(
+    @CurrentUser() user: any,
+    @Param('symbol') symbol: string,
+    @Query('network') network?: string,
+  ) {
+    return this.cryptoService.getWallet(user.id, symbol, network);
   }
 
-  // POST /crypto/wallets/:symbol/address - Generate new deposit address
   @Post('wallets/:symbol/address')
-  generateAddress(
+  async generateAddress(
+    @CurrentUser() user: any,
     @Param('symbol') symbol: string,
     @Body() body: { network?: string },
   ) {
+    const network = body.network || 'ethereum';
+    const wallet = await this.cryptoService.getOrCreateWallet(user.id, symbol, network);
     return {
-      symbol,
-      network: body.network || 'mainnet',
-      address: '0x742d35Cc6634C0532925a3b844Bc9e7595f8C1a0',
+      symbol: wallet.symbol,
+      network: wallet.network,
+      address: wallet.address,
       memo: null,
       qrCode: 'base64_qr_code',
     };
   }
 
-  // POST /crypto/withdraw - Withdraw crypto to external wallet
   @Post('withdraw')
   withdraw(
     @Body() body: {
@@ -287,7 +238,7 @@ export class CryptoController {
     },
   ) {
     return {
-      withdrawalId: 'withdrawal_001',
+      withdrawalId: `withdrawal_${Date.now()}`,
       symbol: body.symbol,
       amount: body.amount,
       address: body.address,
@@ -298,7 +249,6 @@ export class CryptoController {
     };
   }
 
-  // POST /crypto/withdraw/validate - Validate withdrawal address
   @Post('withdraw/validate')
   validateAddress(
     @Body() body: { symbol: string; address: string; network: string },
@@ -311,7 +261,6 @@ export class CryptoController {
     };
   }
 
-  // GET /crypto/deposits - Get deposit history
   @Get('deposits')
   getDeposits(
     @Query('symbol') symbol?: string,
@@ -320,7 +269,6 @@ export class CryptoController {
     return { deposits: [], total: 0 };
   }
 
-  // GET /crypto/withdrawals - Get withdrawal history
   @Get('withdrawals')
   getWithdrawals(
     @Query('symbol') symbol?: string,
@@ -331,7 +279,6 @@ export class CryptoController {
 
   // ==================== RECURRING & AUTO-INVEST ====================
 
-  // POST /crypto/recurring - Set up recurring buy
   @Post('recurring')
   createRecurringBuy(
     @Body() body: {
@@ -344,34 +291,30 @@ export class CryptoController {
     },
   ) {
     return {
-      recurringId: 'recurring_001',
+      recurringId: `recurring_${Date.now()}`,
       symbol: body.symbol,
       fiatAmount: body.fiatAmount,
       frequency: body.frequency,
-      nextExecution: '2024-01-22T09:00:00Z',
+      nextExecution: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       status: 'active',
     };
   }
 
-  // GET /crypto/recurring - List recurring buys
   @Get('recurring')
   getRecurringBuys() {
     return { recurringBuys: [] };
   }
 
-  // POST /crypto/recurring/:id/pause - Pause recurring buy
   @Post('recurring/:id/pause')
   pauseRecurring(@Param('id') id: string) {
     return { message: 'Recurring buy paused' };
   }
 
-  // POST /crypto/recurring/:id/resume - Resume recurring buy
   @Post('recurring/:id/resume')
   resumeRecurring(@Param('id') id: string) {
     return { message: 'Recurring buy resumed' };
   }
 
-  // POST /crypto/recurring/:id/cancel - Cancel recurring buy
   @Post('recurring/:id/cancel')
   cancelRecurring(@Param('id') id: string) {
     return { message: 'Recurring buy cancelled' };
@@ -379,43 +322,23 @@ export class CryptoController {
 
   // ==================== STAKING ====================
 
-  // GET /crypto/staking - Get staking options
   @Get('staking')
   getStakingOptions() {
     return {
       options: [
-        {
-          symbol: 'ETH',
-          apy: 4.5,
-          minStake: 0.01,
-          lockPeriod: null,
-          flexible: true,
-        },
-        {
-          symbol: 'SOL',
-          apy: 6.2,
-          minStake: 1,
-          lockPeriod: 30,
-          flexible: false,
-        },
-        {
-          symbol: 'DOT',
-          apy: 12.0,
-          minStake: 5,
-          lockPeriod: 28,
-          flexible: false,
-        },
+        { symbol: 'ETH', apy: 4.5, minStake: 0.01, lockPeriod: null, flexible: true },
+        { symbol: 'SOL', apy: 6.2, minStake: 1, lockPeriod: 30, flexible: false },
+        { symbol: 'DOT', apy: 12.0, minStake: 5, lockPeriod: 28, flexible: false },
       ],
     };
   }
 
-  // POST /crypto/staking/stake - Stake crypto
   @Post('staking/stake')
   stake(
     @Body() body: { symbol: string; amount: number; lockPeriod?: number },
   ) {
     return {
-      stakeId: 'stake_001',
+      stakeId: `stake_${Date.now()}`,
       symbol: body.symbol,
       amount: body.amount,
       apy: 4.5,
@@ -427,26 +350,11 @@ export class CryptoController {
     };
   }
 
-  // GET /crypto/staking/active - Get active stakes
   @Get('staking/active')
   getActiveStakes() {
-    return {
-      stakes: [
-        {
-          stakeId: 'stake_001',
-          symbol: 'ETH',
-          amount: 1.5,
-          apy: 4.5,
-          earned: 0.0023,
-          startDate: '2024-01-01T00:00:00Z',
-          status: 'active',
-        },
-      ],
-      totalEarned: 0.0023,
-    };
+    return { stakes: [], totalEarned: 0 };
   }
 
-  // POST /crypto/staking/:id/unstake - Unstake crypto
   @Post('staking/:id/unstake')
   unstake(@Param('id') id: string) {
     return {
@@ -455,7 +363,6 @@ export class CryptoController {
     };
   }
 
-  // GET /crypto/staking/rewards - Get staking rewards history
   @Get('staking/rewards')
   getStakingRewards(@Query('symbol') symbol?: string) {
     return { rewards: [], totalEarned: 0 };
@@ -463,54 +370,27 @@ export class CryptoController {
 
   // ==================== TRANSACTIONS ====================
 
-  // GET /crypto/transactions - Get crypto transaction history
   @Get('transactions')
   getTransactions(
+    @CurrentUser() user: any,
     @Query('symbol') symbol?: string,
-    @Query('type') type?: 'buy' | 'sell' | 'swap' | 'deposit' | 'withdrawal' | 'staking',
+    @Query('type') type?: string,
     @Query('limit') limit: number = 20,
     @Query('offset') offset: number = 0,
   ) {
-    return {
-      transactions: [
-        {
-          id: 'crypto_001',
-          type: 'buy',
-          symbol: 'BTC',
-          amount: 0.001,
-          price: 50000.0,
-          fiatAmount: 50.0,
-          fee: 0.5,
-          status: 'completed',
-          createdAt: '2024-01-15T10:00:00Z',
-        },
-      ],
-      total: 1,
-      limit,
-      offset,
-    };
+    return this.cryptoService.getTransactions(user.id, symbol, type, limit, offset);
   }
 
-  // GET /crypto/transactions/:id - Get transaction details
   @Get('transactions/:id')
-  getTransaction(@Param('id') id: string) {
-    return {
-      id,
-      type: 'buy',
-      symbol: 'BTC',
-      amount: 0.001,
-      price: 50000.0,
-      fiatAmount: 50.0,
-      fee: 0.5,
-      status: 'completed',
-      txHash: null,
-      createdAt: '2024-01-15T10:00:00Z',
-    };
+  getTransaction(
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+  ) {
+    return this.cryptoService.getTransaction(user.id, id);
   }
 
   // ==================== ALERTS ====================
 
-  // POST /crypto/alerts - Create price alert
   @Post('alerts')
   createAlert(
     @Body() body: {
@@ -521,7 +401,7 @@ export class CryptoController {
     },
   ) {
     return {
-      alertId: 'alert_001',
+      alertId: `alert_${Date.now()}`,
       symbol: body.symbol,
       targetPrice: body.targetPrice,
       condition: body.condition,
@@ -529,13 +409,11 @@ export class CryptoController {
     };
   }
 
-  // GET /crypto/alerts - List price alerts
   @Get('alerts')
   getAlerts() {
     return { alerts: [] };
   }
 
-  // POST /crypto/alerts/:id/cancel - Cancel price alert
   @Post('alerts/:id/cancel')
   cancelAlert(@Param('id') id: string) {
     return { message: 'Alert cancelled' };
