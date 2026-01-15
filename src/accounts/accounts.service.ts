@@ -153,14 +153,19 @@ export class AccountsService {
 
   async updateBalance(accountId: string, amount: number, operation: 'add' | 'subtract') {
     this.logger.log(`Updating balance for account ${accountId}: ${operation} ${amount}`);
-    const { data: account } = await this.supabaseService
+    const { data: account, error: fetchError } = await this.supabaseService
       .getAdminClient()
       .from('accounts')
-      .select('balance')
+      .select('id, balance')
       .eq('id', accountId)
       .single();
 
-    const currentBalance = Number(account?.balance || 0);
+    if (fetchError || !account) {
+      this.logger.error(`Account ${accountId} not found: ${fetchError?.message || 'No data returned'}`);
+      throw new NotFoundException(`Account not found: ${accountId}`);
+    }
+
+    const currentBalance = Number(account.balance);
     const newBalance = operation === 'add'
       ? currentBalance + amount
       : currentBalance - amount;

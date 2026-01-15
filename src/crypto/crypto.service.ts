@@ -190,7 +190,7 @@ export class CryptoService {
     amount?: number,
     fiatAmount?: number,
   ) {
-    this.logger.log(`Buy crypto request: user=${userId}, symbol=${symbol}, amount=${amount}, fiatAmount=${fiatAmount}`);
+    this.logger.log(`Buy crypto request: user=${userId}, symbol=${symbol}, amount=${amount}, fiatAmount=${fiatAmount} fromAccountId=${fromAccountId}`);
 
     const price = CRYPTO_PRICES[symbol.toUpperCase()];
     if (!price) {
