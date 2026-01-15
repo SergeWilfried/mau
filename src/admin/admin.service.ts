@@ -311,6 +311,40 @@ export class AdminService {
     return { message: 'Transfer rejected and refunded' };
   }
 
+  // ==================== CRYPTO TRANSACTIONS ====================
+
+  async getAllCryptoTransactions(filters: {
+    userId?: string;
+    symbol?: string;
+    type?: string;
+    from?: string;
+    to?: string;
+    limit?: number;
+    offset?: number;
+  }) {
+    let query = this.supabaseService
+      .getAdminClient()
+      .from('crypto_transactions')
+      .select(`
+        *,
+        profiles:user_id (email, first_name, last_name)
+      `, { count: 'exact' });
+
+    if (filters.userId) query = query.eq('user_id', filters.userId);
+    if (filters.symbol) query = query.eq('symbol', filters.symbol.toUpperCase());
+    if (filters.type) query = query.eq('type', filters.type);
+    if (filters.from) query = query.gte('created_at', filters.from);
+    if (filters.to) query = query.lte('created_at', filters.to);
+
+    const { data, error, count } = await query
+      .order('created_at', { ascending: false })
+      .range(filters.offset || 0, (filters.offset || 0) + (filters.limit || 20) - 1);
+
+    if (error) throw new BadRequestException(error.message);
+
+    return { transactions: data, total: count, limit: filters.limit || 20, offset: filters.offset || 0 };
+  }
+
   // ==================== DASHBOARD & ANALYTICS ====================
 
   async getDashboardStats() {

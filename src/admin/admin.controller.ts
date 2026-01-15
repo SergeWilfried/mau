@@ -137,6 +137,24 @@ export class AdminController {
     return this.adminService.rejectTransfer(admin.id, transferId, body.reason);
   }
 
+  // ==================== CRYPTO TRANSACTIONS ====================
+
+  // GET /admin/crypto/transactions - List all crypto transactions
+  @Get('crypto/transactions')
+  getCryptoTransactions(
+    @Query('userId') userId?: string,
+    @Query('symbol') symbol?: string,
+    @Query('type') type?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('limit') limit?: number,
+    @Query('offset') offset?: number,
+  ) {
+    return this.adminService.getAllCryptoTransactions({
+      userId, symbol, type, from, to, limit, offset,
+    });
+  }
+
   // ==================== NOTIFICATIONS ====================
 
   // POST /admin/notifications/send - Send notification to specific user
