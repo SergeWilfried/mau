@@ -1,0 +1,4966 @@
+openapi: 3.0.3
+info:
+  title: Douni API
+  description: |
+    Comprehensive fintech API for multi-currency accounts, P2P transfers, crypto trading,
+    mobile money, bank transfers, staking, and more.
+
+    ## Authentication
+    Most endpoints require Bearer token authentication via Supabase Auth JWT.
+    Include the token in the Authorization header:
+    ```
+    Authorization: Bearer <your_token>
+    ```
+
+    ## Rate Limiting
+    API requests may be subject to rate limiting. Please handle 429 responses appropriately.
+  version: 1.0.0
+  contact:
+    name: API Support
+
+servers:
+  - url: http://localhost:3000
+    description: Development server
+
+tags:
+  - name: Auth
+    description: Authentication and authorization endpoints
+  - name: Users
+    description: User profile and settings management
+  - name: Accounts
+    description: Multi-currency account management
+  - name: Transactions
+    description: Transaction history and analytics
+  - name: Transfers
+    description: Money transfers (internal, P2P, crypto, bank, mobile money)
+  - name: Beneficiaries
+    description: Saved beneficiaries management
+  - name: Exchange
+    description: Currency exchange operations
+  - name: Crypto
+    description: Cryptocurrency trading, wallets, and staking
+  - name: Notifications
+    description: Notifications and alerts management
+  - name: Funding
+    description: Account funding operations
+  - name: Payouts
+    description: Payout operations
+  - name: Admin
+    description: Administrative operations (requires admin role)
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Supabase Auth JWT token
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        dateOfBirth:
+          type: string
+          format: date
+        address:
+          type: object
+          properties:
+            street:
+              type: string
+            city:
+              type: string
+            country:
+              type: string
+            postalCode:
+              type: string
+        role:
+          type: string
+          enum: [user, admin]
+        kycStatus:
+          type: string
+          enum: [pending, approved, rejected]
+        createdAt:
+          type: string
+          format: date-time
+
+    Account:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        currency:
+          type: string
+          example: EUR
+        balance:
+          type: number
+          format: double
+        iban:
+          type: string
+        bic:
+          type: string
+        isMain:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        accountId:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [transfer_in, transfer_out, exchange, crypto, funding, payout]
+        amount:
+          type: number
+          format: double
+        currency:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [pending, completed, failed]
+        fee:
+          type: number
+          format: double
+        exchangeRate:
+          type: number
+          format: double
+        sender:
+          type: object
+          properties:
+            name:
+              type: string
+            accountId:
+              type: string
+        recipient:
+          type: object
+          properties:
+            name:
+              type: string
+            iban:
+              type: string
+        reference:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    Beneficiary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [bank, p2p, mobilemoney]
+        name:
+          type: string
+        iban:
+          type: string
+        bic:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+          format: email
+        currency:
+          type: string
+        isFavorite:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    CryptoAsset:
+      type: object
+      properties:
+        symbol:
+          type: string
+          example: BTC
+        name:
+          type: string
+          example: Bitcoin
+        price:
+          type: number
+          format: double
+        marketCap:
+          type: number
+          format: double
+        volume24h:
+          type: number
+          format: double
+        change24h:
+          type: number
+          format: double
+        change7d:
+          type: number
+          format: double
+        high24h:
+          type: number
+          format: double
+        low24h:
+          type: number
+          format: double
+        allTimeHigh:
+          type: number
+          format: double
+        circulatingSupply:
+          type: number
+          format: double
+        maxSupply:
+          type: number
+          format: double
+
+    CryptoWallet:
+      type: object
+      properties:
+        symbol:
+          type: string
+        balance:
+          type: number
+          format: double
+        address:
+          type: string
+        network:
+          type: string
+
+    Notification:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [transaction, security, marketing, system]
+        title:
+          type: string
+        message:
+          type: string
+        read:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+        statusCode:
+          type: integer
+        error:
+          type: string
+
+    SuccessMessage:
+      type: object
+      properties:
+        message:
+          type: string
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid authorization header
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: Missing or invalid authorization header
+            statusCode: 401
+            error: Unauthorized
+
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: Insufficient permissions
+            statusCode: 403
+            error: Forbidden
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: Resource not found
+            statusCode: 404
+            error: Not Found
+
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: Invalid request parameters
+            statusCode: 400
+            error: Bad Request
+
+paths:
+  /:
+    get:
+      summary: Health check
+      description: Simple health check endpoint
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Service is running
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Hello from NestJS
+
+  # ==================== AUTH ====================
+  /auth/register:
+    post:
+      summary: Register new user
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  minLength: 8
+                phone:
+                  type: string
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+                  accessToken:
+                    type: string
+                  refreshToken:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /auth/login:
+    post:
+      summary: Login with email and password
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+                  refreshToken:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/login-phone:
+    post:
+      summary: Request OTP for phone login
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - phone
+              properties:
+                phone:
+                  type: string
+      responses:
+        '200':
+          description: OTP sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+
+  /auth/verify-otp:
+    post:
+      summary: Verify OTP and login
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - phone
+                - otp
+              properties:
+                phone:
+                  type: string
+                otp:
+                  type: string
+      responses:
+        '200':
+          description: OTP verified, login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+                  refreshToken:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/logout:
+    post:
+      summary: Logout and invalidate token
+      tags:
+        - Auth
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Logged out successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/refresh:
+    post:
+      summary: Refresh access token
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refreshToken
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+                  refreshToken:
+                    type: string
+
+  /auth/forgot-password:
+    post:
+      summary: Request password reset
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Password reset email sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+
+  /auth/reset-password:
+    post:
+      summary: Reset password with token
+      tags:
+        - Auth
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - newPassword
+              properties:
+                newPassword:
+                  type: string
+                  minLength: 8
+      responses:
+        '200':
+          description: Password reset successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+
+  # ==================== USERS ====================
+  /users/me:
+    get:
+      summary: Get current user profile
+      tags:
+        - Users
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    put:
+      summary: Update user profile
+      tags:
+        - Users
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                firstName:
+                  type: string
+                lastName:
+                  type: string
+                dateOfBirth:
+                  type: string
+                  format: date
+                address:
+                  type: object
+                  properties:
+                    street:
+                      type: string
+                    city:
+                      type: string
+                    country:
+                      type: string
+                    postalCode:
+                      type: string
+      responses:
+        '200':
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    delete:
+      summary: Delete user account
+      tags:
+        - Users
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Account deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /users/me/kyc:
+    get:
+      summary: Get KYC verification status
+      tags:
+        - Users
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: KYC status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [pending, approved, rejected]
+                  documents:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        type:
+                          type: string
+                        status:
+                          type: string
+                        uploadedAt:
+                          type: string
+                          format: date-time
+
+  /users/me/kyc/documents:
+    post:
+      summary: Upload KYC document
+      tags:
+        - Users
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - type
+                - filePath
+              properties:
+                type:
+                  type: string
+                  enum: [passport, id_card, drivers_license, proof_of_address]
+                filePath:
+                  type: string
+      responses:
+        '201':
+          description: Document uploaded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  type:
+                    type: string
+                  status:
+                    type: string
+                  uploadedAt:
+                    type: string
+                    format: date-time
+
+  /users/me/settings:
+    get:
+      summary: Get user settings
+      tags:
+        - Users
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: User settings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  language:
+                    type: string
+                  currency:
+                    type: string
+                  twoFactorEnabled:
+                    type: boolean
+
+    put:
+      summary: Update user settings
+      tags:
+        - Users
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                language:
+                  type: string
+                currency:
+                  type: string
+      responses:
+        '200':
+          description: Settings updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+
+  /users/me/settings/2fa/enable:
+    post:
+      summary: Enable 2FA
+      tags:
+        - Users
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 2FA setup initiated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  secret:
+                    type: string
+                  qrCode:
+                    type: string
+
+  /users/me/settings/2fa/confirm:
+    post:
+      summary: Confirm 2FA setup
+      tags:
+        - Users
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - otp
+              properties:
+                otp:
+                  type: string
+      responses:
+        '200':
+          description: 2FA enabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+
+  /users/me/settings/2fa/disable:
+    post:
+      summary: Disable 2FA
+      tags:
+        - Users
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - otp
+              properties:
+                otp:
+                  type: string
+      responses:
+        '200':
+          description: 2FA disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+
+  /users/me/pin:
+    put:
+      summary: Set or update PIN
+      tags:
+        - Users
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - newPin
+              properties:
+                newPin:
+                  type: string
+                  pattern: '^\d{4,6}$'
+      responses:
+        '200':
+          description: PIN updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+
+  /users/me/devices:
+    get:
+      summary: List authorized devices
+      tags:
+        - Users
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of devices
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    deviceName:
+                      type: string
+                    deviceType:
+                      type: string
+                    platform:
+                      type: string
+                    lastActive:
+                      type: string
+                      format: date-time
+
+    post:
+      summary: Register a device
+      tags:
+        - Users
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - deviceName
+                - deviceType
+                - platform
+              properties:
+                deviceName:
+                  type: string
+                deviceType:
+                  type: string
+                pushToken:
+                  type: string
+                platform:
+                  type: string
+                  enum: [ios, android, web]
+      responses:
+        '201':
+          description: Device registered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  deviceName:
+                    type: string
+
+  /users/me/devices/{deviceId}:
+    delete:
+      summary: Revoke device access
+      tags:
+        - Users
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: deviceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Device revoked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+
+  # ==================== ACCOUNTS ====================
+  /accounts:
+    get:
+      summary: List all user accounts
+      tags:
+        - Accounts
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of accounts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accounts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Account'
+
+    post:
+      summary: Create new currency account
+      tags:
+        - Accounts
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - currency
+              properties:
+                currency:
+                  type: string
+                  example: USD
+      responses:
+        '201':
+          description: Account created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+
+  /accounts/{accountId}:
+    get:
+      summary: Get account details
+      tags:
+        - Accounts
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Account details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /accounts/{accountId}/details:
+    get:
+      summary: Get account bank details (IBAN, BIC)
+      tags:
+        - Accounts
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Bank details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  iban:
+                    type: string
+                  bic:
+                    type: string
+                  bankName:
+                    type: string
+                  bankAddress:
+                    type: string
+
+  /accounts/{accountId}/main:
+    put:
+      summary: Set as main account
+      tags:
+        - Accounts
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Main account updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+
+  /accounts/summary/total-balance:
+    get:
+      summary: Get total balance across all accounts
+      tags:
+        - Accounts
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: currency
+          in: query
+          schema:
+            type: string
+          description: Currency to convert total to
+      responses:
+        '200':
+          description: Total balance
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalBalance:
+                    type: number
+                    format: double
+                  currency:
+                    type: string
+
+  /accounts/{accountId}/statements:
+    get:
+      summary: Get account statements
+      tags:
+        - Accounts
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Account statements
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    period:
+                      type: string
+                    openingBalance:
+                      type: number
+                    closingBalance:
+                      type: number
+                    transactions:
+                      type: integer
+
+  /accounts/{accountId}/statements/export:
+    post:
+      summary: Export statement (PDF/CSV)
+      tags:
+        - Accounts
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - format
+                - from
+                - to
+              properties:
+                format:
+                  type: string
+                  enum: [pdf, csv]
+                from:
+                  type: string
+                  format: date
+                to:
+                  type: string
+                  format: date
+      responses:
+        '200':
+          description: Export URL
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  downloadUrl:
+                    type: string
+                    format: uri
+
+  # ==================== TRANSACTIONS ====================
+  /transactions:
+    get:
+      summary: List transactions with filters
+      tags:
+        - Transactions
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: accountId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [transfer_in, transfer_out, exchange, crypto, funding, payout]
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Paginated transactions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transactions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Transaction'
+                  total:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+
+  /transactions/{transactionId}:
+    get:
+      summary: Get transaction details
+      tags:
+        - Transactions
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: transactionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Transaction details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /transactions/status/pending:
+    get:
+      summary: List pending transactions
+      tags:
+        - Transactions
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Pending transactions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transactions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Transaction'
+
+  /transactions/search/query:
+    get:
+      summary: Search transactions
+      tags:
+        - Transactions
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Transaction'
+
+  /transactions/analytics/categories:
+    get:
+      summary: Get spending by category
+      tags:
+        - Transactions
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Category analytics
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    category:
+                      type: string
+                    amount:
+                      type: number
+                      format: double
+                    percentage:
+                      type: number
+                      format: double
+
+  /transactions/analytics/summary:
+    get:
+      summary: Get spending summary
+      tags:
+        - Transactions
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: currency
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Spending summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalIncome:
+                    type: number
+                    format: double
+                  totalExpense:
+                    type: number
+                    format: double
+                  netChange:
+                    type: number
+                    format: double
+                  currency:
+                    type: string
+
+  # ==================== TRANSFERS ====================
+  /transfers/internal:
+    post:
+      summary: Transfer between own accounts
+      tags:
+        - Transfers
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - fromAccountId
+                - toAccountId
+                - amount
+              properties:
+                fromAccountId:
+                  type: string
+                  format: uuid
+                toAccountId:
+                  type: string
+                  format: uuid
+                amount:
+                  type: number
+                  format: double
+      responses:
+        '201':
+          description: Transfer created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+
+  /transfers/p2p:
+    post:
+      summary: Send money to another user
+      tags:
+        - Transfers
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - fromAccountId
+                - recipient
+                - recipientType
+                - amount
+                - currency
+              properties:
+                fromAccountId:
+                  type: string
+                  format: uuid
+                recipient:
+                  type: string
+                  description: Phone number or email
+                recipientType:
+                  type: string
+                  enum: [phone, email]
+                amount:
+                  type: number
+                  format: double
+                currency:
+                  type: string
+                note:
+                  type: string
+      responses:
+        '201':
+          description: Transfer created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+
+  /transfers/crypto:
+    post:
+      summary: Send crypto to external wallet
+      tags:
+        - Transfers
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - fromWalletId
+                - toAddress
+                - symbol
+                - network
+                - amount
+              properties:
+                fromWalletId:
+                  type: string
+                toAddress:
+                  type: string
+                symbol:
+                  type: string
+                  example: BTC
+                network:
+                  type: string
+                  example: bitcoin
+                amount:
+                  type: number
+                  format: double
+                note:
+                  type: string
+      responses:
+        '201':
+          description: Transfer initiated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+
+  /transfers/mobile-money:
+    post:
+      summary: Send to mobile money
+      tags:
+        - Transfers
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - fromAccountId
+                - provider
+                - phone
+                - recipientName
+                - amount
+                - currency
+              properties:
+                fromAccountId:
+                  type: string
+                  format: uuid
+                provider:
+                  type: string
+                  example: mpesa
+                phone:
+                  type: string
+                recipientName:
+                  type: string
+                amount:
+                  type: number
+                  format: double
+                currency:
+                  type: string
+                note:
+                  type: string
+      responses:
+        '201':
+          description: Transfer initiated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+
+  /transfers/mobile-money/providers:
+    get:
+      summary: Get mobile money providers
+      tags:
+        - Transfers
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: country
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of providers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    name:
+                      type: string
+                    countries:
+                      type: array
+                      items:
+                        type: string
+
+  /transfers/bank:
+    post:
+      summary: Bank transfer (SEPA/SWIFT)
+      tags:
+        - Transfers
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - fromAccountId
+                - amount
+                - currency
+                - transferType
+              properties:
+                fromAccountId:
+                  type: string
+                  format: uuid
+                beneficiaryId:
+                  type: string
+                  format: uuid
+                iban:
+                  type: string
+                bic:
+                  type: string
+                recipientName:
+                  type: string
+                amount:
+                  type: number
+                  format: double
+                currency:
+                  type: string
+                reference:
+                  type: string
+                transferType:
+                  type: string
+                  enum: [sepa, swift]
+      responses:
+        '201':
+          description: Transfer initiated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+
+  /transfers/request:
+    post:
+      summary: Request money from someone
+      tags:
+        - Transfers
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - recipient
+                - recipientType
+                - amount
+                - currency
+              properties:
+                recipient:
+                  type: string
+                recipientType:
+                  type: string
+                  enum: [phone, email]
+                amount:
+                  type: number
+                  format: double
+                currency:
+                  type: string
+                note:
+                  type: string
+      responses:
+        '201':
+          description: Request created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  status:
+                    type: string
+                  createdAt:
+                    type: string
+                    format: date-time
+
+  /transfers/requests:
+    get:
+      summary: List payment requests
+      tags:
+        - Transfers
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Payment requests
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  incoming:
+                    type: array
+                    items:
+                      type: object
+                  outgoing:
+                    type: array
+                    items:
+                      type: object
+
+  /transfers/requests/{requestId}/accept:
+    post:
+      summary: Accept payment request
+      tags:
+        - Transfers
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - fromAccountId
+              properties:
+                fromAccountId:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: Request accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+
+  /transfers/requests/{requestId}/decline:
+    post:
+      summary: Decline payment request
+      tags:
+        - Transfers
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Request declined
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+
+  /transfers/schedule:
+    post:
+      summary: Schedule a future transfer
+      tags:
+        - Transfers
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - type
+                - transferDetails
+                - scheduledDate
+              properties:
+                type:
+                  type: string
+                  enum: [internal, p2p, bank]
+                transferDetails:
+                  type: object
+                scheduledDate:
+                  type: string
+                  format: date-time
+                recurring:
+                  type: object
+                  properties:
+                    frequency:
+                      type: string
+                      enum: [daily, weekly, monthly]
+                    endDate:
+                      type: string
+                      format: date
+      responses:
+        '201':
+          description: Transfer scheduled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  scheduledDate:
+                    type: string
+                    format: date-time
+                  status:
+                    type: string
+
+  /transfers/scheduled:
+    get:
+      summary: List scheduled transfers
+      tags:
+        - Transfers
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Scheduled transfers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    type:
+                      type: string
+                    scheduledDate:
+                      type: string
+                      format: date-time
+                    status:
+                      type: string
+
+  /transfers/scheduled/{id}/cancel:
+    post:
+      summary: Cancel scheduled transfer
+      tags:
+        - Transfers
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Transfer cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+
+  # ==================== BENEFICIARIES ====================
+  /beneficiaries:
+    get:
+      summary: List all saved beneficiaries
+      tags:
+        - Beneficiaries
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [bank, p2p, mobilemoney]
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of beneficiaries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  beneficiaries:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Beneficiary'
+
+    post:
+      summary: Add new beneficiary
+      tags:
+        - Beneficiaries
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - type
+                - name
+              properties:
+                type:
+                  type: string
+                  enum: [bank, p2p, mobilemoney]
+                name:
+                  type: string
+                iban:
+                  type: string
+                bic:
+                  type: string
+                phone:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                currency:
+                  type: string
+      responses:
+        '201':
+          description: Beneficiary created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Beneficiary'
+
+  /beneficiaries/{id}:
+    get:
+      summary: Get beneficiary details
+      tags:
+        - Beneficiaries
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Beneficiary details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Beneficiary'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      summary: Update beneficiary
+      tags:
+        - Beneficiaries
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                isFavorite:
+                  type: boolean
+      responses:
+        '200':
+          description: Beneficiary updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+
+    delete:
+      summary: Delete beneficiary
+      tags:
+        - Beneficiaries
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Beneficiary deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+
+  /beneficiaries/{id}/favorite:
+    post:
+      summary: Mark as favorite
+      tags:
+        - Beneficiaries
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Marked as favorite
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+
+    delete:
+      summary: Remove from favorites
+      tags:
+        - Beneficiaries
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Removed from favorites
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+
+  /beneficiaries/validate-iban:
+    post:
+      summary: Validate IBAN
+      tags:
+        - Beneficiaries
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - iban
+              properties:
+                iban:
+                  type: string
+      responses:
+        '200':
+          description: IBAN validation result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid:
+                    type: boolean
+                  bankName:
+                    type: string
+                  bic:
+                    type: string
+                  country:
+                    type: string
+
+  /beneficiaries/list/recent:
+    get:
+      summary: Get recently used beneficiaries
+      tags:
+        - Beneficiaries
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: Recent beneficiaries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  beneficiaries:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Beneficiary'
+
+  # ==================== EXCHANGE ====================
+  /exchange/rates:
+    get:
+      summary: Get current exchange rates
+      tags:
+        - Exchange
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: base
+          in: query
+          schema:
+            type: string
+            default: EUR
+      responses:
+        '200':
+          description: Exchange rates
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  base:
+                    type: string
+                  rates:
+                    type: object
+                    additionalProperties:
+                      type: number
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /exchange/rate:
+    get:
+      summary: Get specific exchange rate
+      tags:
+        - Exchange
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: amount
+          in: query
+          schema:
+            type: number
+      responses:
+        '200':
+          description: Exchange rate
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  from:
+                    type: string
+                  to:
+                    type: string
+                  rate:
+                    type: number
+                  amount:
+                    type: number
+                  convertedAmount:
+                    type: number
+
+  /exchange/convert:
+    post:
+      summary: Convert currency between accounts
+      tags:
+        - Exchange
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - fromAccountId
+                - toAccountId
+              properties:
+                fromAccountId:
+                  type: string
+                  format: uuid
+                toAccountId:
+                  type: string
+                  format: uuid
+                fromAmount:
+                  type: number
+                  format: double
+                toAmount:
+                  type: number
+                  format: double
+      responses:
+        '201':
+          description: Conversion completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+
+  /exchange/quote:
+    post:
+      summary: Get exchange quote
+      tags:
+        - Exchange
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - fromCurrency
+                - toCurrency
+              properties:
+                fromCurrency:
+                  type: string
+                toCurrency:
+                  type: string
+                fromAmount:
+                  type: number
+                  format: double
+                toAmount:
+                  type: number
+                  format: double
+      responses:
+        '200':
+          description: Exchange quote
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  quoteId:
+                    type: string
+                  rate:
+                    type: number
+                  fromAmount:
+                    type: number
+                  toAmount:
+                    type: number
+                  fee:
+                    type: number
+                  expiresAt:
+                    type: string
+                    format: date-time
+
+  /exchange/execute:
+    post:
+      summary: Execute quoted exchange
+      tags:
+        - Exchange
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - quoteId
+                - fromAccountId
+                - toAccountId
+              properties:
+                quoteId:
+                  type: string
+                fromAccountId:
+                  type: string
+                  format: uuid
+                toAccountId:
+                  type: string
+                  format: uuid
+      responses:
+        '201':
+          description: Exchange executed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transactionId:
+                    type: string
+                  status:
+                    type: string
+
+  /exchange/supported-currencies:
+    get:
+      summary: List supported currencies
+      tags:
+        - Exchange
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Supported currencies
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  currencies:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        code:
+                          type: string
+                        name:
+                          type: string
+                        symbol:
+                          type: string
+
+  /exchange/history:
+    get:
+      summary: Get exchange history
+      tags:
+        - Exchange
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Exchange history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  exchanges:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Transaction'
+                  total:
+                    type: integer
+
+  # ==================== CRYPTO ====================
+  /crypto/portfolio:
+    get:
+      summary: Get crypto portfolio overview
+      tags:
+        - Crypto
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: currency
+          in: query
+          schema:
+            type: string
+            default: USD
+      responses:
+        '200':
+          description: Portfolio overview
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalValue:
+                    type: number
+                  currency:
+                    type: string
+                  change24h:
+                    type: number
+                  assets:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        symbol:
+                          type: string
+                        balance:
+                          type: number
+                        value:
+                          type: number
+                        change24h:
+                          type: number
+
+  /crypto/assets:
+    get:
+      summary: List available cryptocurrencies
+      tags:
+        - Crypto
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of crypto assets
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  assets:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CryptoAsset'
+
+  /crypto/assets/{symbol}:
+    get:
+      summary: Get crypto asset details
+      tags:
+        - Crypto
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Asset details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CryptoAsset'
+
+  /crypto/prices:
+    get:
+      summary: Get current crypto prices
+      tags:
+        - Crypto
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: symbols
+          in: query
+          schema:
+            type: string
+          description: Comma-separated list of symbols
+        - name: currency
+          in: query
+          schema:
+            type: string
+            default: USD
+      responses:
+        '200':
+          description: Current prices
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+                  properties:
+                    price:
+                      type: number
+                    change24h:
+                      type: number
+
+  /crypto/assets/{symbol}/chart:
+    get:
+      summary: Get price chart data
+      tags:
+        - Crypto
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [1h, 24h, 7d, 30d, 1y]
+            default: 24h
+        - name: currency
+          in: query
+          schema:
+            type: string
+            default: USD
+      responses:
+        '200':
+          description: Chart data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+                    price:
+                      type: number
+
+  /crypto/buy:
+    post:
+      summary: Buy cryptocurrency
+      tags:
+        - Crypto
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - symbol
+                - fromAccountId
+              properties:
+                symbol:
+                  type: string
+                amount:
+                  type: number
+                  description: Amount of crypto to buy
+                fiatAmount:
+                  type: number
+                  description: Amount of fiat to spend
+                fromAccountId:
+                  type: string
+                  format: uuid
+      responses:
+        '201':
+          description: Purchase completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+
+  /crypto/sell:
+    post:
+      summary: Sell cryptocurrency
+      tags:
+        - Crypto
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - symbol
+                - toAccountId
+              properties:
+                symbol:
+                  type: string
+                amount:
+                  type: number
+                fiatAmount:
+                  type: number
+                toAccountId:
+                  type: string
+                  format: uuid
+      responses:
+        '201':
+          description: Sale completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+
+  /crypto/swap:
+    post:
+      summary: Swap between cryptocurrencies
+      tags:
+        - Crypto
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - fromSymbol
+                - toSymbol
+              properties:
+                fromSymbol:
+                  type: string
+                toSymbol:
+                  type: string
+                fromAmount:
+                  type: number
+                toAmount:
+                  type: number
+      responses:
+        '201':
+          description: Swap completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+
+  /crypto/quote:
+    post:
+      summary: Get trade quote
+      tags:
+        - Crypto
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - type
+              properties:
+                type:
+                  type: string
+                  enum: [buy, sell, swap]
+                fromSymbol:
+                  type: string
+                toSymbol:
+                  type: string
+                symbol:
+                  type: string
+                amount:
+                  type: number
+                fiatAmount:
+                  type: number
+      responses:
+        '200':
+          description: Trade quote
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  quoteId:
+                    type: string
+                  price:
+                    type: number
+                  fromAmount:
+                    type: number
+                  toAmount:
+                    type: number
+                  fee:
+                    type: number
+                  expiresAt:
+                    type: string
+                    format: date-time
+
+  /crypto/execute:
+    post:
+      summary: Execute a quoted trade
+      tags:
+        - Crypto
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - quoteId
+              properties:
+                quoteId:
+                  type: string
+                fromAccountId:
+                  type: string
+                  format: uuid
+                toAccountId:
+                  type: string
+                  format: uuid
+      responses:
+        '201':
+          description: Trade executed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transactionId:
+                    type: string
+                  status:
+                    type: string
+
+  /crypto/wallets:
+    get:
+      summary: Get crypto wallet addresses
+      tags:
+        - Crypto
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Crypto wallets
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  wallets:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CryptoWallet'
+
+  /crypto/wallets/{symbol}:
+    get:
+      summary: Get wallet for specific crypto
+      tags:
+        - Crypto
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: network
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Wallet details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CryptoWallet'
+
+  /crypto/wallets/{symbol}/address:
+    post:
+      summary: Generate new deposit address
+      tags:
+        - Crypto
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                network:
+                  type: string
+      responses:
+        '201':
+          description: New address generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  address:
+                    type: string
+                  qrCode:
+                    type: string
+
+  /crypto/withdraw:
+    post:
+      summary: Withdraw crypto to external wallet
+      tags:
+        - Crypto
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - symbol
+                - amount
+                - address
+                - network
+              properties:
+                symbol:
+                  type: string
+                amount:
+                  type: number
+                address:
+                  type: string
+                network:
+                  type: string
+                memo:
+                  type: string
+      responses:
+        '201':
+          description: Withdrawal initiated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+
+  /crypto/withdraw/validate:
+    post:
+      summary: Validate withdrawal address
+      tags:
+        - Crypto
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - symbol
+                - address
+                - network
+              properties:
+                symbol:
+                  type: string
+                address:
+                  type: string
+                network:
+                  type: string
+      responses:
+        '200':
+          description: Address validation result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid:
+                    type: boolean
+                  addressType:
+                    type: string
+
+  /crypto/deposits:
+    get:
+      summary: Get deposit history
+      tags:
+        - Crypto
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: symbol
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Deposit history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Transaction'
+
+  /crypto/withdrawals:
+    get:
+      summary: Get withdrawal history
+      tags:
+        - Crypto
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: symbol
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Withdrawal history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Transaction'
+
+  /crypto/recurring:
+    get:
+      summary: List recurring buys
+      tags:
+        - Crypto
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Recurring buys
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  recurringBuys:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        symbol:
+                          type: string
+                        fiatAmount:
+                          type: number
+                        frequency:
+                          type: string
+                        status:
+                          type: string
+
+    post:
+      summary: Set up recurring buy
+      tags:
+        - Crypto
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - symbol
+                - fiatAmount
+                - fromAccountId
+                - frequency
+              properties:
+                symbol:
+                  type: string
+                fiatAmount:
+                  type: number
+                fromAccountId:
+                  type: string
+                  format: uuid
+                frequency:
+                  type: string
+                  enum: [daily, weekly, monthly]
+                dayOfWeek:
+                  type: integer
+                  minimum: 0
+                  maximum: 6
+                dayOfMonth:
+                  type: integer
+                  minimum: 1
+                  maximum: 28
+      responses:
+        '201':
+          description: Recurring buy created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  status:
+                    type: string
+
+  /crypto/recurring/{id}/pause:
+    post:
+      summary: Pause recurring buy
+      tags:
+        - Crypto
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Recurring buy paused
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+
+  /crypto/recurring/{id}/resume:
+    post:
+      summary: Resume recurring buy
+      tags:
+        - Crypto
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Recurring buy resumed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+
+  /crypto/recurring/{id}/cancel:
+    post:
+      summary: Cancel recurring buy
+      tags:
+        - Crypto
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Recurring buy cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+
+  /crypto/staking:
+    get:
+      summary: Get staking options
+      tags:
+        - Crypto
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Staking options
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  options:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        symbol:
+                          type: string
+                        apy:
+                          type: number
+                        minAmount:
+                          type: number
+                        lockPeriods:
+                          type: array
+                          items:
+                            type: integer
+
+  /crypto/staking/stake:
+    post:
+      summary: Stake crypto
+      tags:
+        - Crypto
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - symbol
+                - amount
+              properties:
+                symbol:
+                  type: string
+                amount:
+                  type: number
+                lockPeriod:
+                  type: integer
+                  description: Lock period in days
+      responses:
+        '201':
+          description: Stake created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  symbol:
+                    type: string
+                  amount:
+                    type: number
+                  apy:
+                    type: number
+                  unlockDate:
+                    type: string
+                    format: date-time
+
+  /crypto/staking/active:
+    get:
+      summary: Get active stakes
+      tags:
+        - Crypto
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Active stakes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  stakes:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        symbol:
+                          type: string
+                        amount:
+                          type: number
+                        earned:
+                          type: number
+                        unlockDate:
+                          type: string
+                          format: date-time
+                  totalEarned:
+                    type: number
+
+  /crypto/staking/{id}/unstake:
+    post:
+      summary: Unstake crypto
+      tags:
+        - Crypto
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Unstake initiated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  availableAt:
+                    type: string
+                    format: date-time
+
+  /crypto/staking/rewards:
+    get:
+      summary: Get staking rewards history
+      tags:
+        - Crypto
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: symbol
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Staking rewards
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rewards:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        symbol:
+                          type: string
+                        amount:
+                          type: number
+                        date:
+                          type: string
+                          format: date-time
+                  totalEarned:
+                    type: number
+
+  /crypto/transactions:
+    get:
+      summary: Get crypto transaction history
+      tags:
+        - Crypto
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: symbol
+          in: query
+          schema:
+            type: string
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [buy, sell, swap, deposit, withdrawal, stake, unstake]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Crypto transactions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transactions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Transaction'
+                  total:
+                    type: integer
+
+  /crypto/transactions/{id}:
+    get:
+      summary: Get crypto transaction details
+      tags:
+        - Crypto
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Transaction details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+
+  /crypto/alerts:
+    get:
+      summary: List price alerts
+      tags:
+        - Crypto
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Price alerts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  alerts:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        symbol:
+                          type: string
+                        targetPrice:
+                          type: number
+                        condition:
+                          type: string
+                        status:
+                          type: string
+
+    post:
+      summary: Create price alert
+      tags:
+        - Crypto
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - symbol
+                - targetPrice
+                - condition
+              properties:
+                symbol:
+                  type: string
+                targetPrice:
+                  type: number
+                condition:
+                  type: string
+                  enum: [above, below]
+                currency:
+                  type: string
+                  default: USD
+      responses:
+        '201':
+          description: Alert created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  status:
+                    type: string
+
+  /crypto/alerts/{id}/cancel:
+    post:
+      summary: Cancel price alert
+      tags:
+        - Crypto
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Alert cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+
+  # ==================== NOTIFICATIONS ====================
+  /notifications:
+    get:
+      summary: List notifications
+      tags:
+        - Notifications
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: read
+          in: query
+          schema:
+            type: boolean
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Notifications list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  notifications:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Notification'
+                  total:
+                    type: integer
+                  unreadCount:
+                    type: integer
+
+    delete:
+      summary: Delete all notifications
+      tags:
+        - Notifications
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: All notifications deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+
+  /notifications/{id}:
+    get:
+      summary: Get notification details
+      tags:
+        - Notifications
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Notification details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+
+    delete:
+      summary: Delete notification
+      tags:
+        - Notifications
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Notification deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+
+  /notifications/{id}/read:
+    put:
+      summary: Mark notification as read
+      tags:
+        - Notifications
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Marked as read
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+
+  /notifications/read-all:
+    put:
+      summary: Mark all notifications as read
+      tags:
+        - Notifications
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: All marked as read
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+
+  /notifications/settings/preferences:
+    get:
+      summary: Get notification preferences
+      tags:
+        - Notifications
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Notification preferences
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  push:
+                    type: boolean
+                  email:
+                    type: boolean
+                  sms:
+                    type: boolean
+
+    put:
+      summary: Update notification preferences
+      tags:
+        - Notifications
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                push:
+                  type: boolean
+                email:
+                  type: boolean
+                sms:
+                  type: boolean
+      responses:
+        '200':
+          description: Preferences updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+
+  /notifications/device-token:
+    post:
+      summary: Register device for push notifications
+      tags:
+        - Notifications
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - token
+                - platform
+              properties:
+                token:
+                  type: string
+                platform:
+                  type: string
+                  enum: [ios, android]
+      responses:
+        '200':
+          description: Device registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+
+    delete:
+      summary: Unregister device
+      tags:
+        - Notifications
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - token
+              properties:
+                token:
+                  type: string
+      responses:
+        '200':
+          description: Device unregistered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+
+  /notifications/price-alerts:
+    get:
+      summary: List exchange price alerts
+      tags:
+        - Notifications
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Price alerts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  alerts:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        fromCurrency:
+                          type: string
+                        toCurrency:
+                          type: string
+                        targetRate:
+                          type: number
+                        condition:
+                          type: string
+
+    post:
+      summary: Create exchange price alert
+      tags:
+        - Notifications
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - fromCurrency
+                - toCurrency
+                - targetRate
+                - condition
+              properties:
+                fromCurrency:
+                  type: string
+                toCurrency:
+                  type: string
+                targetRate:
+                  type: number
+                condition:
+                  type: string
+                  enum: [above, below]
+      responses:
+        '201':
+          description: Alert created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+
+  /notifications/price-alerts/{id}:
+    delete:
+      summary: Delete price alert
+      tags:
+        - Notifications
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Alert deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+
+  # ==================== FUNDING ====================
+  /funding:
+    get:
+      summary: List funding requests
+      tags:
+        - Funding
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, completed, failed]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Funding requests
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  fundingRequests:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        method:
+                          type: string
+                        amount:
+                          type: number
+                        status:
+                          type: string
+                        createdAt:
+                          type: string
+                          format: date-time
+                  total:
+                    type: integer
+
+  /funding/wire:
+    post:
+      summary: Initiate wire transfer funding
+      tags:
+        - Funding
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - accountId
+                - amount
+                - currency
+              properties:
+                accountId:
+                  type: string
+                  format: uuid
+                amount:
+                  type: number
+                currency:
+                  type: string
+      responses:
+        '201':
+          description: Wire funding initiated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  bankDetails:
+                    type: object
+                    properties:
+                      iban:
+                        type: string
+                      bic:
+                        type: string
+                      reference:
+                        type: string
+                  status:
+                    type: string
+
+  /funding/crypto:
+    post:
+      summary: Initiate crypto funding
+      tags:
+        - Funding
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - accountId
+                - symbol
+                - network
+              properties:
+                accountId:
+                  type: string
+                  format: uuid
+                symbol:
+                  type: string
+                network:
+                  type: string
+                expectedAmount:
+                  type: number
+      responses:
+        '201':
+          description: Crypto funding initiated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  depositAddress:
+                    type: string
+                  qrCode:
+                    type: string
+                  status:
+                    type: string
+
+  /funding/mobile-money:
+    post:
+      summary: Initiate mobile money funding
+      tags:
+        - Funding
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - accountId
+                - provider
+                - phone
+                - amount
+                - currency
+              properties:
+                accountId:
+                  type: string
+                  format: uuid
+                provider:
+                  type: string
+                phone:
+                  type: string
+                amount:
+                  type: number
+                currency:
+                  type: string
+      responses:
+        '201':
+          description: Mobile money funding initiated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  instructions:
+                    type: string
+                  status:
+                    type: string
+
+  /funding/{fundingId}:
+    get:
+      summary: Get funding request details
+      tags:
+        - Funding
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: fundingId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Funding details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  method:
+                    type: string
+                  amount:
+                    type: number
+                  currency:
+                    type: string
+                  status:
+                    type: string
+                  createdAt:
+                    type: string
+                    format: date-time
+
+  /funding/{fundingId}/cancel:
+    post:
+      summary: Cancel funding request
+      tags:
+        - Funding
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: fundingId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Funding cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+
+  /funding/methods/available:
+    get:
+      summary: Get available funding methods
+      tags:
+        - Funding
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: country
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Available funding methods
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  methods:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+                        type:
+                          type: string
+                        minAmount:
+                          type: number
+                        maxAmount:
+                          type: number
+                        fee:
+                          type: number
+
+  # ==================== PAYOUTS ====================
+  /payouts:
+    get:
+      summary: List payout requests
+      tags:
+        - Payouts
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, completed, failed]
+        - name: method
+          in: query
+          schema:
+            type: string
+            enum: [bank, mobile_money]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Payout requests
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  payouts:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        method:
+                          type: string
+                        amount:
+                          type: number
+                        status:
+                          type: string
+                        createdAt:
+                          type: string
+                          format: date-time
+                  total:
+                    type: integer
+
+  /payouts/bank:
+    post:
+      summary: Initiate bank account payout
+      tags:
+        - Payouts
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - fromAccountId
+                - country
+                - amount
+                - currency
+              properties:
+                fromAccountId:
+                  type: string
+                  format: uuid
+                beneficiaryId:
+                  type: string
+                  format: uuid
+                bankName:
+                  type: string
+                accountName:
+                  type: string
+                accountNumber:
+                  type: string
+                iban:
+                  type: string
+                bic:
+                  type: string
+                routingNumber:
+                  type: string
+                country:
+                  type: string
+                amount:
+                  type: number
+                currency:
+                  type: string
+                reference:
+                  type: string
+      responses:
+        '201':
+          description: Bank payout initiated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  status:
+                    type: string
+                  estimatedArrival:
+                    type: string
+                    format: date-time
+
+  /payouts/mobile-money:
+    post:
+      summary: Initiate mobile money payout
+      tags:
+        - Payouts
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - fromAccountId
+                - provider
+                - phone
+                - recipientName
+                - amount
+                - currency
+              properties:
+                fromAccountId:
+                  type: string
+                  format: uuid
+                beneficiaryId:
+                  type: string
+                  format: uuid
+                provider:
+                  type: string
+                phone:
+                  type: string
+                recipientName:
+                  type: string
+                amount:
+                  type: number
+                currency:
+                  type: string
+                note:
+                  type: string
+      responses:
+        '201':
+          description: Mobile money payout initiated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  status:
+                    type: string
+
+  /payouts/quote:
+    get:
+      summary: Get payout quote
+      tags:
+        - Payouts
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: method
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [bank, mobile_money]
+        - name: amount
+          in: query
+          required: true
+          schema:
+            type: number
+        - name: currency
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: country
+          in: query
+          schema:
+            type: string
+        - name: provider
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Payout quote
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  fee:
+                    type: number
+                  totalAmount:
+                    type: number
+                  exchangeRate:
+                    type: number
+                  estimatedArrival:
+                    type: string
+
+  /payouts/methods:
+    get:
+      summary: Get available payout methods
+      tags:
+        - Payouts
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: country
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Available payout methods
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  methods:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+                        type:
+                          type: string
+
+  /payouts/{payoutId}:
+    get:
+      summary: Get payout details
+      tags:
+        - Payouts
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: payoutId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Payout details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  method:
+                    type: string
+                  amount:
+                    type: number
+                  currency:
+                    type: string
+                  status:
+                    type: string
+                  createdAt:
+                    type: string
+                    format: date-time
+
+  /payouts/{payoutId}/cancel:
+    post:
+      summary: Cancel payout
+      tags:
+        - Payouts
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: payoutId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Payout cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+
+  # ==================== ADMIN ====================
+  /admin/dashboard:
+    get:
+      summary: Get admin dashboard statistics
+      tags:
+        - Admin
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Dashboard stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalUsers:
+                    type: integer
+                  activeUsers:
+                    type: integer
+                  totalTransactions:
+                    type: integer
+                  totalVolume:
+                    type: number
+                  pendingKyc:
+                    type: integer
+                  pendingTransfers:
+                    type: integer
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/users:
+    get:
+      summary: List all users
+      tags:
+        - Admin
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [user, admin]
+        - name: kycStatus
+          in: query
+          schema:
+            type: string
+            enum: [pending, approved, rejected]
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+                  total:
+                    type: integer
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/users/{userId}:
+    get:
+      summary: Get user details
+      tags:
+        - Admin
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /admin/users/{userId}/role:
+    put:
+      summary: Update user role
+      tags:
+        - Admin
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - role
+              properties:
+                role:
+                  type: string
+                  enum: [user, admin]
+      responses:
+        '200':
+          description: Role updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/users/{userId}/suspend:
+    post:
+      summary: Suspend user
+      tags:
+        - Admin
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - reason
+              properties:
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: User suspended
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/users/{userId}/unsuspend:
+    post:
+      summary: Unsuspend user
+      tags:
+        - Admin
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: User unsuspended
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/kyc/pending:
+    get:
+      summary: List pending KYC documents
+      tags:
+        - Admin
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Pending KYC documents
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  documents:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        userId:
+                          type: string
+                        type:
+                          type: string
+                        status:
+                          type: string
+                        uploadedAt:
+                          type: string
+                          format: date-time
+                  total:
+                    type: integer
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/kyc/{documentId}/approve:
+    post:
+      summary: Approve KYC document
+      tags:
+        - Admin
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Document approved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/kyc/{documentId}/reject:
+    post:
+      summary: Reject KYC document
+      tags:
+        - Admin
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - reason
+              properties:
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Document rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/transactions:
+    get:
+      summary: List all transactions
+      tags:
+        - Admin
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: type
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, completed, failed]
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: minAmount
+          in: query
+          schema:
+            type: number
+        - name: maxAmount
+          in: query
+          schema:
+            type: number
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: All transactions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transactions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Transaction'
+                  total:
+                    type: integer
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/transfers/pending:
+    get:
+      summary: List pending transfers
+      tags:
+        - Admin
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Pending transfers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transfers:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Transaction'
+                  total:
+                    type: integer
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/transfers/{transferId}/approve:
+    post:
+      summary: Approve transfer
+      tags:
+        - Admin
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: transferId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Transfer approved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/transfers/{transferId}/reject:
+    post:
+      summary: Reject transfer
+      tags:
+        - Admin
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: transferId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - reason
+              properties:
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Transfer rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/notifications/send:
+    post:
+      summary: Send notification to user
+      tags:
+        - Admin
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - userId
+                - type
+                - title
+                - message
+              properties:
+                userId:
+                  type: string
+                  format: uuid
+                type:
+                  type: string
+                  enum: [transaction, security, marketing, system]
+                title:
+                  type: string
+                message:
+                  type: string
+      responses:
+        '200':
+          description: Notification sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/notifications/broadcast:
+    post:
+      summary: Broadcast notification to all users
+      tags:
+        - Admin
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - type
+                - title
+                - message
+              properties:
+                type:
+                  type: string
+                  enum: [transaction, security, marketing, system]
+                title:
+                  type: string
+                message:
+                  type: string
+                targetRole:
+                  type: string
+                  enum: [user, admin]
+      responses:
+        '200':
+          description: Notification broadcast
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/audit-logs:
+    get:
+      summary: Get audit logs
+      tags:
+        - Admin
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: adminId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: action
+          in: query
+          schema:
+            type: string
+        - name: targetType
+          in: query
+          schema:
+            type: string
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Audit logs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  logs:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        adminId:
+                          type: string
+                        action:
+                          type: string
+                        targetType:
+                          type: string
+                        targetId:
+                          type: string
+                        details:
+                          type: object
+                        createdAt:
+                          type: string
+                          format: date-time
+                  total:
+                    type: integer
+        '403':
+          $ref: '#/components/responses/Forbidden'
