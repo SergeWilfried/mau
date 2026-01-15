@@ -12,7 +12,7 @@ export class BeneficiariesController {
   @Get()
   getBeneficiaries(
     @CurrentUser() user: any,
-    @Query('type') type?: 'bank' | 'p2p' | 'mobilemoney',
+    @Query('type') type?: 'bank' | 'p2p' | 'mobilemoney | crypto',
     @Query('search') search?: string,
   ) {
     return this.beneficiariesService.getBeneficiaries(user.id, type, search);
