@@ -193,13 +193,15 @@ export class AccountsService {
     userId: string,
     filters: {
       type?: 'fiat' | 'crypto' | 'all';
+      accountId?: string;
+      walletId?: string;
       from?: string;
       to?: string;
       limit?: number;
       offset?: number;
     } = {},
   ) {
-    const { type = 'all', from, to, limit = 20, offset = 0 } = filters;
+    const { type = 'all', accountId, walletId, from, to, limit = 20, offset = 0 } = filters;
     this.logger.log(`Fetching all activity for user ${userId} with filters: ${JSON.stringify(filters)}`);
 
     const fetchFiat = type === 'all' || type === 'fiat';
@@ -207,8 +209,8 @@ export class AccountsService {
 
     // Fetch both transaction types in parallel
     const [fiatResult, cryptoResult] = await Promise.all([
-      fetchFiat ? this.getFiatTransactions(userId, from, to) : Promise.resolve([]),
-      fetchCrypto ? this.getCryptoTransactions(userId, from, to) : Promise.resolve([]),
+      fetchFiat ? this.getFiatTransactions(userId, { accountId, from, to }) : Promise.resolve([]),
+      fetchCrypto ? this.getCryptoTransactions(userId, { walletId, from, to }) : Promise.resolve([]),
     ]);
 
     // Normalize and merge transactions
@@ -233,13 +235,18 @@ export class AccountsService {
     };
   }
 
-  private async getFiatTransactions(userId: string, from?: string, to?: string) {
+  private async getFiatTransactions(
+    userId: string,
+    filters: { accountId?: string; from?: string; to?: string },
+  ) {
+    const { accountId, from, to } = filters;
     let query = this.supabaseService
       .getAdminClient()
       .from('transactions')
       .select('*')
       .eq('user_id', userId);
 
+    if (accountId) query = query.eq('account_id', accountId);
     if (from) query = query.gte('created_at', from);
     if (to) query = query.lte('created_at', to);
 
@@ -252,13 +259,18 @@ export class AccountsService {
     return data || [];
   }
 
-  private async getCryptoTransactions(userId: string, from?: string, to?: string) {
+  private async getCryptoTransactions(
+    userId: string,
+    filters: { walletId?: string; from?: string; to?: string },
+  ) {
+    const { walletId, from, to } = filters;
     let query = this.supabaseService
       .getAdminClient()
       .from('crypto_transactions')
       .select('*')
       .eq('user_id', userId);
 
+    if (walletId) query = query.eq('wallet_id', walletId);
     if (from) query = query.gte('created_at', from);
     if (to) query = query.lte('created_at', to);
 

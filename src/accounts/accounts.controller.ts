@@ -26,6 +26,8 @@ export class AccountsController {
   getAllActivity(
     @CurrentUser() user: any,
     @Query('type') type?: 'fiat' | 'crypto' | 'all',
+    @Query('accountId') accountId?: string,
+    @Query('walletId') walletId?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('limit') limit?: string,
@@ -33,6 +35,8 @@ export class AccountsController {
   ) {
     return this.accountsService.getAllActivity(user.id, {
       type,
+      accountId,
+      walletId,
       from,
       to,
       limit: limit ? parseInt(limit, 10) : undefined,
