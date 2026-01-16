@@ -20,6 +20,26 @@ export class AccountsController {
     return this.accountsService.createAccount(user.id, body.currency);
   }
 
+  // GET /accounts/all-activity - Get unified activity feed (fiat + crypto transactions)
+  // Note: This must come BEFORE :accountId routes to avoid matching "all-activity" as accountId
+  @Get('all-activity')
+  getAllActivity(
+    @CurrentUser() user: any,
+    @Query('type') type?: 'fiat' | 'crypto' | 'all',
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return this.accountsService.getAllActivity(user.id, {
+      type,
+      from,
+      to,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      offset: offset ? parseInt(offset, 10) : undefined,
+    });
+  }
+
   // GET /accounts/summary/total-balance - Get total balance in preferred currency
   // Note: This must come BEFORE :accountId routes to avoid matching "summary" as accountId
   @Get('summary/total-balance')

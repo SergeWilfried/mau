@@ -189,6 +189,181 @@ export class AccountsService {
     return newBalance;
   }
 
+  async getAllActivity(
+    userId: string,
+    filters: {
+      type?: 'fiat' | 'crypto' | 'all';
+      from?: string;
+      to?: string;
+      limit?: number;
+      offset?: number;
+    } = {},
+  ) {
+    const { type = 'all', from, to, limit = 20, offset = 0 } = filters;
+    this.logger.log(`Fetching all activity for user ${userId} with filters: ${JSON.stringify(filters)}`);
+
+    const fetchFiat = type === 'all' || type === 'fiat';
+    const fetchCrypto = type === 'all' || type === 'crypto';
+
+    // Fetch both transaction types in parallel
+    const [fiatResult, cryptoResult] = await Promise.all([
+      fetchFiat ? this.getFiatTransactions(userId, from, to) : Promise.resolve([]),
+      fetchCrypto ? this.getCryptoTransactions(userId, from, to) : Promise.resolve([]),
+    ]);
+
+    // Normalize and merge transactions
+    const normalizedFiat = fiatResult.map((tx) => this.normalizeFiatTransaction(tx));
+    const normalizedCrypto = cryptoResult.map((tx) => this.normalizeCryptoTransaction(tx));
+
+    // Combine and sort by date descending
+    const allActivity = [...normalizedFiat, ...normalizedCrypto].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    );
+
+    // Apply pagination
+    const paginatedActivity = allActivity.slice(offset, offset + limit);
+
+    this.logger.log(`Returning ${paginatedActivity.length} activities out of ${allActivity.length} total`);
+
+    return {
+      activities: paginatedActivity,
+      total: allActivity.length,
+      limit,
+      offset,
+    };
+  }
+
+  private async getFiatTransactions(userId: string, from?: string, to?: string) {
+    let query = this.supabaseService
+      .getAdminClient()
+      .from('transactions')
+      .select('*')
+      .eq('user_id', userId);
+
+    if (from) query = query.gte('created_at', from);
+    if (to) query = query.lte('created_at', to);
+
+    const { data, error } = await query.order('created_at', { ascending: false });
+
+    if (error) {
+      this.logger.error(`Failed to fetch fiat transactions: ${error.message}`);
+      return [];
+    }
+    return data || [];
+  }
+
+  private async getCryptoTransactions(userId: string, from?: string, to?: string) {
+    let query = this.supabaseService
+      .getAdminClient()
+      .from('crypto_transactions')
+      .select('*')
+      .eq('user_id', userId);
+
+    if (from) query = query.gte('created_at', from);
+    if (to) query = query.lte('created_at', to);
+
+    const { data, error } = await query.order('created_at', { ascending: false });
+
+    if (error) {
+      this.logger.error(`Failed to fetch crypto transactions: ${error.message}`);
+      return [];
+    }
+    return data || [];
+  }
+
+  private normalizeFiatTransaction(tx: any) {
+    return {
+      id: tx.id,
+      source: 'fiat' as const,
+      type: tx.type,
+      amount: Number(tx.amount),
+      currency: tx.currency,
+      fee: Number(tx.fee || 0),
+      fee_currency: tx.currency,
+      status: tx.status,
+      description: tx.description || this.getFiatDescription(tx),
+      reference: tx.reference,
+      created_at: tx.created_at,
+      completed_at: tx.completed_at,
+      metadata: {
+        account_id: tx.account_id,
+        balance_after: tx.balance_after,
+        ...tx.metadata,
+      },
+    };
+  }
+
+  private normalizeCryptoTransaction(tx: any) {
+    const isSwap = tx.type === 'swap';
+
+    return {
+      id: tx.id,
+      source: 'crypto' as const,
+      type: `crypto_${tx.type}`,
+      amount: Number(tx.amount),
+      currency: tx.symbol,
+      fee: Number(tx.fee || 0),
+      fee_currency: tx.fee_currency || tx.symbol,
+      status: tx.status,
+      description: this.getCryptoDescription(tx),
+      reference: tx.tx_hash,
+      created_at: tx.created_at,
+      completed_at: tx.completed_at,
+      metadata: {
+        wallet_id: tx.wallet_id,
+        symbol: tx.symbol,
+        price_per_unit: tx.price_per_unit,
+        fiat_amount: tx.fiat_amount,
+        fiat_currency: tx.fiat_currency,
+        ...(isSwap && {
+          to_symbol: tx.to_symbol,
+          to_amount: tx.to_amount,
+        }),
+        ...(tx.external_address && { external_address: tx.external_address }),
+        ...(tx.network && { network: tx.network }),
+        ...(tx.tx_hash && { tx_hash: tx.tx_hash }),
+      },
+    };
+  }
+
+  private getFiatDescription(tx: any): string {
+    const typeDescriptions: Record<string, string> = {
+      deposit: 'Deposit',
+      withdrawal: 'Withdrawal',
+      transfer_in: 'Transfer received',
+      transfer_out: 'Transfer sent',
+      exchange_in: 'Exchange credit',
+      exchange_out: 'Exchange debit',
+      p2p_in: 'P2P received',
+      p2p_out: 'P2P sent',
+      fee: 'Fee',
+    };
+    return typeDescriptions[tx.type] || tx.type;
+  }
+
+  private getCryptoDescription(tx: any): string {
+    switch (tx.type) {
+      case 'buy':
+        return `Bought ${tx.amount} ${tx.symbol}`;
+      case 'sell':
+        return `Sold ${tx.amount} ${tx.symbol}`;
+      case 'swap':
+        return `Swapped ${tx.amount} ${tx.symbol} to ${tx.to_amount} ${tx.to_symbol}`;
+      case 'deposit':
+        return `Deposited ${tx.amount} ${tx.symbol}`;
+      case 'withdrawal':
+        return `Withdrew ${tx.amount} ${tx.symbol}`;
+      case 'staking':
+        return `Staked ${tx.amount} ${tx.symbol}`;
+      case 'unstaking':
+        return `Unstaked ${tx.amount} ${tx.symbol}`;
+      case 'reward':
+        return `Staking reward: ${tx.amount} ${tx.symbol}`;
+      default:
+        return `${tx.type} ${tx.amount} ${tx.symbol}`;
+    }
+  }
+
   private generateIBAN(): string {
     const countryCode = 'GB';
     const checkDigits = '00';
