@@ -295,6 +295,7 @@ export class AccountsService {
 
   private normalizeCryptoTransaction(tx: any) {
     const isSwap = tx.type === 'swap';
+    const isBuyOrSell = tx.type === 'buy' || tx.type === 'sell';
 
     return {
       id: tx.id,
@@ -304,6 +305,11 @@ export class AccountsService {
       currency: tx.symbol,
       fee: Number(tx.fee || 0),
       fee_currency: tx.fee_currency || tx.symbol,
+      // For buy/sell, include fiat amount at top level for easy access
+      ...(isBuyOrSell && {
+        fiat_amount: tx.fiat_amount ? Number(tx.fiat_amount) : null,
+        fiat_currency: tx.fiat_currency || 'EUR',
+      }),
       status: tx.status,
       description: this.getCryptoDescription(tx),
       reference: tx.tx_hash,
@@ -313,8 +319,6 @@ export class AccountsService {
         wallet_id: tx.wallet_id,
         symbol: tx.symbol,
         price_per_unit: tx.price_per_unit,
-        fiat_amount: tx.fiat_amount,
-        fiat_currency: tx.fiat_currency,
         ...(isSwap && {
           to_symbol: tx.to_symbol,
           to_amount: tx.to_amount,
