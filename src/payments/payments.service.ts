@@ -24,7 +24,7 @@ export class PaymentsService {
 
     const ephemeralKey = await stripe.ephemeralKeys.create(
       { customer: stripeCustomerId },
-      { apiVersion: '2025-12-18.acacia' },
+      { apiVersion: '2024-12-18.acacia' },
     );
 
     const paymentIntent = await stripe.paymentIntents.create({
