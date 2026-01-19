@@ -16,6 +16,7 @@ import { CryptoModule } from './crypto/crypto.module';
 import { AdminModule } from './admin/admin.module';
 import { FundingModule } from './funding/funding.module';
 import { PayoutsModule } from './payouts/payouts.module';
+import { PaymentsModule } from './payments/payments.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { PayoutsModule } from './payouts/payouts.module';
     AdminModule,
     FundingModule,
     PayoutsModule,
+    PaymentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
