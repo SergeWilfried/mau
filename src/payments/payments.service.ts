@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { UpdatePaymentDto } from './dto/update-payment.dto';
 import { stripe } from 'src/utils/stripe';
@@ -6,58 +6,47 @@ import { stripe } from 'src/utils/stripe';
 @Injectable()
 export class PaymentsService {
   async create(createPaymentDto: CreatePaymentDto) {
-    const {cryptoSymbol, cryptoAmount, amount, customerId, currency } = createPaymentDto;
+    const { cryptoSymbol, cryptoAmount, amount, customerId, currency } = createPaymentDto;
+
     if (!amount || amount <= 0) {
-      return Response.json(
-          { error: "Invalid amount" },
-          { status: 400 }
-      );
-  }
+      throw new BadRequestException('Invalid amount');
+    }
 
-  if (!cryptoSymbol || !cryptoAmount) {
-      return Response.json(
-          { error: "Crypto details required" },
-          { status: 400 }
-      );
-  }
+    if (!cryptoSymbol || !cryptoAmount) {
+      throw new BadRequestException('Crypto details required');
+    }
 
-    try {
-          // Create or retrieve customer
     let stripeCustomerId = customerId;
     if (!stripeCustomerId) {
-        const customer = await stripe.customers.create();
-        stripeCustomerId = customer.id;
+      const customer = await stripe.customers.create();
+      stripeCustomerId = customer.id;
     }
 
     const ephemeralKey = await stripe.ephemeralKeys.create(
-        { customer: stripeCustomerId },
-        { apiVersion: "2025-12-18.acacia" }
+      { customer: stripeCustomerId },
+      { apiVersion: '2025-12-18.acacia' },
     );
 
     const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.floor(amount * 100),
-        currency: currency.toLowerCase(),
-        customer: stripeCustomerId,
-        automatic_payment_methods: {
-            enabled: true,
-        },
-        metadata: {
-            type: "crypto_purchase",
-            cryptoSymbol,
-            cryptoAmount: cryptoAmount.toString(),
-        },
+      amount: Math.floor(amount * 100),
+      currency: currency.toLowerCase(),
+      customer: stripeCustomerId,
+      automatic_payment_methods: {
+        enabled: true,
+      },
+      metadata: {
+        type: 'crypto_purchase',
+        cryptoSymbol,
+        cryptoAmount: cryptoAmount.toString(),
+      },
     });
 
-    return Response.json({
-        paymentIntent: paymentIntent.client_secret,
-        ephemeralKey: ephemeralKey.secret,
-        customer: stripeCustomerId,
-        publishableKey: process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY,
-    });
-    } catch (error) {
-      
-    }
-    return 'This action adds a new payment';
+    return {
+      paymentIntent: paymentIntent.client_secret,
+      ephemeralKey: ephemeralKey.secret,
+      customer: stripeCustomerId,
+      publishableKey: process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY,
+    };
   }
 
   async findAll() {
