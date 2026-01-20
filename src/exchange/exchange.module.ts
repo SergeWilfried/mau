@@ -5,9 +5,9 @@ import { AccountsModule } from '../accounts/accounts.module';
 import { TransactionsModule } from '../transactions/transactions.module';
 
 @Module({
-  imports: [AccountsModule, TransactionsModule],
-  controllers: [ExchangeController],
-  providers: [ExchangeService],
-  exports: [ExchangeService],
+    imports: [AccountsModule, TransactionsModule],
+    controllers: [ExchangeController],
+    providers: [ExchangeService],
+    exports: [ExchangeService]
 })
 export class ExchangeModule {}

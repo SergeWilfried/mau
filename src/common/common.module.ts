@@ -5,7 +5,7 @@ import { RolesGuard } from './guards/roles.guard';
 
 @Global()
 @Module({
-  providers: [StorageService, AuthGuard, RolesGuard],
-  exports: [StorageService, AuthGuard, RolesGuard],
+    providers: [StorageService, AuthGuard, RolesGuard],
+    exports: [StorageService, AuthGuard, RolesGuard]
 })
 export class CommonModule {}

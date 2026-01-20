@@ -17,27 +17,29 @@ import { AdminModule } from './admin/admin.module';
 import { FundingModule } from './funding/funding.module';
 import { PayoutsModule } from './payouts/payouts.module';
 import { PaymentsModule } from './payments/payments.module';
+import { BridgeModule } from './bridge/bridge.module';
 
 @Module({
-  imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
-    SupabaseModule,
-    CommonModule,
-    AuthModule,
-    UsersModule,
-    AccountsModule,
-    TransactionsModule,
-    TransfersModule,
-    ExchangeModule,
-    BeneficiariesModule,
-    NotificationsModule,
-    CryptoModule,
-    AdminModule,
-    FundingModule,
-    PayoutsModule,
-    PaymentsModule,
-  ],
-  controllers: [AppController],
-  providers: [AppService],
+    imports: [
+        ConfigModule.forRoot({ isGlobal: true }),
+        SupabaseModule,
+        CommonModule,
+        AuthModule,
+        UsersModule,
+        AccountsModule,
+        TransactionsModule,
+        TransfersModule,
+        ExchangeModule,
+        BeneficiariesModule,
+        NotificationsModule,
+        CryptoModule,
+        AdminModule,
+        FundingModule,
+        PayoutsModule,
+        PaymentsModule,
+        BridgeModule
+    ],
+    controllers: [AppController],
+    providers: [AppService]
 })
 export class AppModule {}

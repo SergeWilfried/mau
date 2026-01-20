@@ -5,9 +5,9 @@ import { SupabaseModule } from '../supabase/supabase.module';
 import { CommonModule } from '../common/common.module';
 
 @Module({
-  imports: [SupabaseModule, CommonModule],
-  controllers: [TransactionsController],
-  providers: [TransactionsService],
-  exports: [TransactionsService],
+    imports: [SupabaseModule, CommonModule],
+    controllers: [TransactionsController],
+    providers: [TransactionsService],
+    exports: [TransactionsService]
 })
 export class TransactionsModule {}
